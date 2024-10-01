@@ -1,0 +1,83 @@
+<template>
+  <div>
+    <div ref="mapContainer" class="map-container"></div>
+  </div>
+</template>
+
+<script setup>
+import mapboxgl from "mapbox-gl";
+import { onMounted, onUnmounted, ref } from "vue";
+import axios from "axios";
+
+
+const BearerToken = ref("");
+
+mapboxgl.accessToken = "myToken";
+
+const mapContainer = ref(null);
+let map;
+
+fetch('http://myendpoint/api/token').then((response) => {
+      return response.json();
+    }).then((data) => {
+      BearerToken.value = data.bearer;
+      console.log(BearerToken.value);
+      return data.bearer;
+    })
+
+onMounted(() => {
+  map = new mapboxgl.Map({
+    container: mapContainer.value,
+    style: "mapbox://styles/mapbox/streets-v11",
+    center: [-97.331965, 32.739309999999996],
+    zoom: 18,
+    transformRequest: (url, resourceType) => {
+      if (resourceType === 'Tile' && url.includes('https://myendpoint')) {
+        return {
+          url: url,
+          headers: {
+            'Authorization': `Bearer ${BearerToken.value}`,
+            'Content-Type': 'application/json',
+            'Content-Encoding': 'gzip'
+          }
+        }
+      }
+    }
+  });
+
+  map.on("load", () => {
+    map.scrollZoom.setWheelZoomRate(1 / 100);
+
+    map.resize();
+
+     map.addSource('Substations', {
+        type: "vector",
+        tiles: [
+          'https://myendpoint/api/v1/map-management/collection/substation/tile/{z}/{x}/{y}'
+        ],
+      })
+
+      map.addLayer({
+        id: "Substations",
+        type: "circle",
+        source: "Substations",
+        'source-layer': 'Substations',
+        paint: {
+          "circle-radius": 12,
+          "circle-color": "#3956FF",
+        },
+      });
+  });
+});
+
+onUnmounted(() => {
+  if (map) map.remove();
+});
+</script>
+
+<style scoped>
+.map-container {
+  width: 100%;
+  height: 100vh;
+}
+</style>
